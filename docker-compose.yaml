@@ -1,0 +1,42 @@
+services:
+  ext_authz-grpc-service:
+    build:
+      context: ./auth/grpc-service
+      dockerfile: Dockerfile
+    volumes:
+      - ./auth/casbin:/casbin:ro
+  ext_authz-http-service:
+    build:
+      context: ./auth/http-service
+      dockerfile: Dockerfile
+    volumes:
+      - ./auth/casbin:/casbin:ro
+  ext_authz-opa-service:
+    build:
+      context: ./docker/opa
+      dockerfile: Dockerfile
+    command:
+      - run
+      - '--server'
+      - '--log-format=json-pretty'
+      - '--set=plugins.envoy_ext_authz_grpc.addr=:9002'
+      - '--set=decision_logs.console=true'
+      - /etc/policy.rego
+    volumes:
+      - ./docker/opa/config/opa-service/policy.rego:/etc/policy.rego:ro
+  front-envoy:
+    build:
+      context: ./docker/envoy
+      dockerfile: Dockerfile
+    depends_on:
+      - upstream-service
+        # condition: service_healthy
+    environment:
+      - FRONT_ENVOY_YAML
+    ports:
+      - ${PORT_PROXY:-8000}:8000
+  upstream-service:
+    build:
+      context: ./upstream/service
+      dockerfile: Dockerfile
+version: '3.8'
